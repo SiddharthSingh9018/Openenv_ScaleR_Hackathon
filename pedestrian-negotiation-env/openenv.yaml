@@ -1,0 +1,51 @@
+name: pedestrian-negotiation
+version: "1.0.0"
+description: >
+  POMDP environment for autonomous vehicle negotiation with a
+  pedestrian crossing an urban road under uncertainty.
+tags: [autonomous-driving, pedestrian, pomdp, safety, real-world]
+
+tasks:
+  - id: task_1_static
+    description: "Static pedestrian at road edge. Easy."
+    difficulty: easy
+    max_steps: 80
+  - id: task_2_stochastic
+    description: "Stochastic crossing pedestrian. Medium."
+    difficulty: medium
+    max_steps: 80
+  - id: task_3_adversarial
+    description: "Adversarial hesitating pedestrian. Hard."
+    difficulty: hard
+    max_steps: 80
+
+action_space:
+  type: discrete
+  values: [STRONG_BRAKE, SOFT_BRAKE, COAST, SOFT_ACCEL, STRONG_ACCEL]
+
+observation_space:
+  type: object
+  fields:
+    vehicle_x:         {type: float}
+    vehicle_speed:     {type: float}
+    ped_x:             {type: float}
+    ped_y:             {type: float}
+    ped_vx:            {type: float}
+    belief_crossing:   {type: float}
+    belief_hesitating: {type: float}
+    belief_retreating: {type: float}
+    step:              {type: int}
+    collision:         {type: bool}
+    crossed:           {type: bool}
+    vehicle_crossed:   {type: bool}
+
+endpoints:
+  reset:    POST /reset
+  step:     POST /step
+  state:    GET  /state
+  tasks:    GET  /tasks
+  grader:   POST /grader
+  baseline: GET  /baseline
+
+docker:
+  port: 7860
