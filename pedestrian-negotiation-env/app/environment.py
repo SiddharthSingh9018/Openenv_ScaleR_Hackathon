@@ -148,27 +148,40 @@ class PedestrianNegotiationEnv:
 					self.ped_intent = PedIntent.HESITATING
 					self.ped_vx = 0.0
 		elif self.task == "task_3_adversarial":
-			# Adversarial intent switching
-			dist = abs(self.vehicle_x - CROSSING_Y)
+			# Hardened adversarial logic
+			dist = abs(self.vehicle_x - self.ped_y)
 			if self.ped_intent == PedIntent.CROSSING:
-				if dist < 12.0 and self.vehicle_speed > 3.0:
-					if self._rng.random() < 0.6:
+				# Hesitate even when vehicle is further away and slower
+				if dist < 18.0 and self.vehicle_speed > 1.5:
+					if self._rng.random() < 0.7:
 						self.ped_intent = PedIntent.HESITATING
 						self.ped_vx = 0.0
 				else:
-					self.ped_x += 1.2 * DT + _gauss(0, 0.05)
+					self.ped_x += 1.2 * DT + self._rng.gauss(0, 0.08)
+					if self.ped_x >= ROAD_WIDTH + 0.5:
+						self.ped_x = ROAD_WIDTH + 0.5
+						self.ped_intent = PedIntent.RETREATING
+						self.ped_vx = -1.2
 			elif self.ped_intent == PedIntent.HESITATING:
-				if (self.vehicle_speed < 2.0 or dist > 15.0) and self._rng.random() < 0.4:
+				# Much slower to resume — requires vehicle to nearly stop
+				if dist > 20.0 or self.vehicle_speed < 0.5:
+					if self._rng.random() < 0.25:
+						self.ped_intent = PedIntent.CROSSING
+						self.ped_vx = 1.2
+				# Frequently re-enters road unpredictably
+				elif self._rng.random() < 0.2:
 					self.ped_intent = PedIntent.CROSSING
 					self.ped_vx = 1.2
-				elif self._rng.random() < 0.1:
+				elif self._rng.random() < 0.15:
 					self.ped_intent = PedIntent.RETREATING
 					self.ped_vx = -1.2
 			elif self.ped_intent == PedIntent.RETREATING:
-				self.ped_x += self.ped_vx * DT + _gauss(0, 0.05)
-				if self.ped_x <= -0.5:
-					self.ped_intent = PedIntent.HESITATING
-					self.ped_vx = 0.0
+				self.ped_x += self.ped_vx * DT
+				self.ped_x = max(self.ped_x, -0.5)
+				# Surprise re-entry: retreating ped suddenly steps back in
+				if self.ped_x > 0.5 and self._rng.random() < 0.08:
+					self.ped_intent = PedIntent.CROSSING
+					self.ped_vx = 1.2
 
 		# Clamp ped_x
 		self.ped_x = max(-0.5, min(self.ped_x, ROAD_WIDTH + 0.5))
@@ -199,16 +212,34 @@ class PedestrianNegotiationEnv:
 		for k in self._belief:
 			self._belief[k] /= norm
 
-		# Reward calculation
-		safety = -20.0 if self.collision else 0.0
+		# Reward calculation (rebalanced)
+		# 1. Reduce collision penalty
+		safety = -10.0 if self.collision else 0.0
 		if not self.collision and dist_to_crossing < 8.0 and ped_in_road:
 			safety += -1.0 * (self.vehicle_speed / 8.0) * (1 - min(dist_to_crossing, 8.0)/8.0)
+
+		# 2. Add small positive reward for forward progress (distance to crossing reduced)
+		if not hasattr(self, '_prev_dist_to_crossing'):
+			self._prev_dist_to_crossing = abs(0.0 - CROSSING_Y)
+		progress = self._prev_dist_to_crossing - dist_to_crossing
+		progress_reward = 0.03 * progress  # small positive for reducing distance
+		self._prev_dist_to_crossing = dist_to_crossing
+
+		# 3. Add small penalty for staying idle too long
+		if not hasattr(self, '_idle_steps'):
+			self._idle_steps = 0
+		if self.vehicle_speed < 0.2:
+			self._idle_steps += 1
+		else:
+			self._idle_steps = 0
+		idle_penalty = -0.1 if self._idle_steps >= 4 else 0.0  # penalize if idle 4+ steps
+
 		efficiency = self.vehicle_speed * 0.02
 		if self.vehicle_crossed and not self.collision:
 			efficiency += 5.0
 		smoothness = -0.05 * abs(accel - self.prev_accel)
 		belief_accuracy = 0.1 * self._belief[self.ped_intent]
-		total = safety + efficiency + smoothness + belief_accuracy
+		total = safety + efficiency + smoothness + belief_accuracy + progress_reward + idle_penalty
 		reward = Reward(
 			total=total,
 			safety=safety,

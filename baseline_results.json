@@ -1,16 +1,16 @@
 {
   "task_1_static": {
-    "score": 0.96,
+    "score": 1.0,
     "steps": 7,
     "collision": false
   },
   "task_2_stochastic": {
-    "score": 0.7714,
+    "score": 0.7801,
     "steps": 29,
     "collision": false
   },
   "task_3_adversarial": {
-    "score": 0.8811,
+    "score": 0.8589,
     "steps": 9,
     "collision": false
   }
