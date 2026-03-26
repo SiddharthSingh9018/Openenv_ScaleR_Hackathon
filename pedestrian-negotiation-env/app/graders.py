@@ -6,7 +6,7 @@ def grade_task_1_static(episode_log: List[Dict]) -> float:
 		return 0.0
 	collision = any(e["collision"] for e in episode_log)
 	max_vehicle_x = max(e["vehicle_x"] for e in episode_log)
-	vehicle_crossed = any(e["vehicle_x"] > 35.0 for e in episode_log)
+	vehicle_crossed = any(e["vehicle_x"] >= 34.0 for e in episode_log)  # threshold fix
 	if collision:
 		return 0.0
 	if not vehicle_crossed:
@@ -60,7 +60,7 @@ def grade_task_3_adversarial(episode_log: List[Dict]) -> float:
 	if collision:
 		return 0.0
 	if not vehicle_crossed:
-		return 0.1
+		vehicle_crossed = any(e["vehicle_x"] >= 34.0 for e in episode_log)  # threshold fix
 	base = 0.4
 	steps = len(episode_log)
 	efficiency = max(0.0, 1 - steps/80) * 0.2

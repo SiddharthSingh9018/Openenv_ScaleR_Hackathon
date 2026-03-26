@@ -67,6 +67,7 @@ class PedestrianNegotiationEnv:
 		self.seed = seed
 		self._rng = random.Random(seed)
 		self._episode_log: List[Dict] = []
+		self._vehicle_speed = 5.0  # BUG 2: set starting speed to 5.0
 		self.reset()
 
 	def reset(self) -> Observation:
@@ -74,7 +75,7 @@ class PedestrianNegotiationEnv:
 		self.step_count = 0
 		self.done = False
 		self.vehicle_x = 0.0
-		self.vehicle_speed = 0.0
+		self.vehicle_speed = 5.0  # BUG 2: set starting speed to 5.0
 		self.prev_accel = 0.0
 		self.collision = False
 		self.crossed = False
@@ -232,10 +233,14 @@ class PedestrianNegotiationEnv:
 
 		# Termination
 		self.step_count += 1
+		# BUG 1: Only end when ped fully retreats home, not just crossed
+		ped_retreated_home = (
+			self.ped_intent.value == "RETREATING" and self.ped_x <= -0.4
+		)
 		if (
 			self.collision or
 			self.vehicle_crossed or
-			self.crossed or
+			ped_retreated_home or
 			self.step_count >= MAX_STEPS
 		):
 			self.done = True

@@ -98,25 +98,26 @@ def grader(req: GraderRequest):
 @app.get("/baseline")
 def baseline():
 	results = {}
-	for t in TASKS:
-		env = PedestrianNegotiationEnv(t.id, 42)
-		obs = env.reset()
-		steps = 0
-		done = False
-		while not done and steps < 80:
-			# Rule-based agent
-			ped_in_road = 0.0 <= obs.ped_x <= 6.0
-			dist = abs(obs.vehicle_x - 30.0)
-			if ped_in_road and dist < 10.0:
-				action = Action.STRONG_BRAKE
-			elif ped_in_road and dist < 20.0:
-				action = Action.SOFT_BRAKE
-			elif obs.ped_x >= 6.0 or obs.belief_retreating > 0.6:
-				action = Action.SOFT_ACCEL
-			else:
-				action = Action.COAST
-			obs, reward, done, _ = env.step(action)
-			steps += 1
+	       for t in TASKS:
+		       env = PedestrianNegotiationEnv(t.id, 42)
+		       obs = env.reset()
+		       steps = 0
+		       done = False
+		       while not done and steps < 80:
+			       # BUG 3: Improved rule-based agent logic
+			       ped_in_road = 0.0 < obs.ped_x < 6.0
+			       dist        = abs(obs.vehicle_x - obs.ped_y)
+			       ped_safe    = obs.ped_x <= -0.2 or obs.ped_x >= 6.4
+			       if ped_in_road and dist < 12.0:
+				       action = Action.STRONG_BRAKE
+			       elif ped_in_road and dist < 22.0:
+				       action = Action.SOFT_BRAKE
+			       elif ped_safe:
+				       action = Action.STRONG_ACCEL
+			       else:
+				       action = Action.COAST
+			       obs, reward, done, _ = env.step(action)
+			       steps += 1
 		fn = GRADERS[t.id]
 		score = fn(env.episode_log)
 		results[t.id] = {"score": score, "steps": steps, "collision": any(e["collision"] for e in env.episode_log)}
