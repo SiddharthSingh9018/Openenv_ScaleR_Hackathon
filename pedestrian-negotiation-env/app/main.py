@@ -1,8 +1,8 @@
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Dict
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -42,6 +42,32 @@ TASKS = [
 	TaskInfo(id="task_2_stochastic", description="Stochastic crossing pedestrian. Medium.", difficulty="medium", max_steps=80),
 	TaskInfo(id="task_3_adversarial", description="Adversarial hesitating pedestrian. Hard.", difficulty="hard", max_steps=80),
 ]
+
+
+def _select_baseline_action(task: str, obs: Observation) -> Action:
+	dist_to_crossing = max(0.0, 30.0 - obs.vehicle_x)
+	vehicle_speed = max(obs.vehicle_speed, 0.1)
+	time_to_crossing = dist_to_crossing / vehicle_speed
+	ped_in_road = -0.1 <= obs.ped_x <= 6.1
+	ped_advancing = obs.ped_vx > 0.2 or obs.belief_crossing > 0.52
+	ped_retreating = obs.ped_vx < -0.2 or obs.belief_retreating > 0.58 or obs.ped_x >= 6.0
+	cautious_bias = 0.35 if task == "task_3_adversarial" else 0.0
+
+	if ped_in_road and time_to_crossing < 1.4 + cautious_bias:
+		return Action.STRONG_BRAKE
+	if ped_advancing and obs.ped_x > -0.15 and time_to_crossing < 2.5 + cautious_bias:
+		return Action.SOFT_BRAKE
+	if ped_advancing and obs.ped_x > 1.2 and time_to_crossing < 3.0 + cautious_bias:
+		return Action.SOFT_BRAKE
+	if ped_retreating and dist_to_crossing > 4.0:
+		return Action.SOFT_ACCEL if task == "task_3_adversarial" else Action.STRONG_ACCEL
+	if task == "task_1_static" and obs.ped_x < 0.0 and obs.belief_hesitating > 0.55:
+		return Action.STRONG_ACCEL
+	if obs.belief_hesitating > 0.55 and dist_to_crossing > 10.0:
+		return Action.SOFT_ACCEL
+	if dist_to_crossing < 8.0 and not ped_in_road:
+		return Action.STRONG_ACCEL
+	return Action.COAST
 
 @app.get("/")
 def root():
@@ -98,26 +124,15 @@ def grader(req: GraderRequest):
 @app.get("/baseline")
 def baseline():
 	results = {}
-	       for t in TASKS:
-		       env = PedestrianNegotiationEnv(t.id, 42)
-		       obs = env.reset()
-		       steps = 0
-		       done = False
-		       while not done and steps < 80:
-			       # BUG 3: Improved rule-based agent logic
-			       ped_in_road = 0.0 < obs.ped_x < 6.0
-			       dist        = abs(obs.vehicle_x - obs.ped_y)
-			       ped_safe    = obs.ped_x <= -0.2 or obs.ped_x >= 6.4
-			       if ped_in_road and dist < 12.0:
-				       action = Action.STRONG_BRAKE
-			       elif ped_in_road and dist < 22.0:
-				       action = Action.SOFT_BRAKE
-			       elif ped_safe:
-				       action = Action.STRONG_ACCEL
-			       else:
-				       action = Action.COAST
-			       obs, reward, done, _ = env.step(action)
-			       steps += 1
+	for t in TASKS:
+		env = PedestrianNegotiationEnv(t.id, 42)
+		obs = env.reset()
+		steps = 0
+		done = False
+		while not done and steps < t.max_steps:
+			action = _select_baseline_action(t.id, obs)
+			obs, _, done, _ = env.step(action)
+			steps += 1
 		fn = GRADERS[t.id]
 		score = fn(env.episode_log)
 		results[t.id] = {"score": score, "steps": steps, "collision": any(e["collision"] for e in env.episode_log)}

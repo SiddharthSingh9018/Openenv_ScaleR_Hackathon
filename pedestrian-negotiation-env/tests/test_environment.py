@@ -14,6 +14,8 @@ def test_reset_returns_observation():
 	assert isinstance(obs, Observation)
 	assert obs.step == 0
 	assert obs.vehicle_x == 0.0
+	assert obs.dist_to_crossing == 30.0
+	assert obs.time_to_crossing > 0.0
 
 def test_step_returns_types():
 	env = PedestrianNegotiationEnv("task_1_static")
@@ -91,8 +93,17 @@ def test_state_contains_keys():
 	env = PedestrianNegotiationEnv("task_1_static")
 	env.reset()
 	state = env.state()
-	for k in ["vehicle_x", "vehicle_speed", "ped_x", "ped_y", "ped_vx", "step", "collision", "crossed", "vehicle_crossed", "true_intent", "belief", "_episode_log"]:
+	for k in ["vehicle_x", "vehicle_speed", "dist_to_crossing", "time_to_crossing", "ped_x", "ped_y", "ped_vx", "step", "collision", "crossed", "vehicle_crossed", "true_intent", "belief", "_episode_log"]:
 		assert k in state
+
+def test_derived_crossing_metrics_are_consistent():
+	env = PedestrianNegotiationEnv("task_1_static")
+	obs = env.reset()
+	assert obs.dist_to_crossing == 30.0
+	assert abs(obs.time_to_crossing - 6.0) < 1e-6
+	obs, _, _, _ = env.step(Action.STRONG_ACCEL)
+	assert obs.dist_to_crossing < 30.0
+	assert obs.time_to_crossing >= 0.0
 
 @pytest.mark.parametrize("task", TASKS)
 def test_task_resets_cleanly(task):
@@ -175,3 +186,42 @@ def test_reward_shape():
 	assert isinstance(reward.smoothness, float)
 	assert isinstance(reward.belief_accuracy, float)
 	assert 0.0 <= reward.belief_accuracy <= 0.11
+
+def test_seeded_episode_is_reproducible():
+	actions = [
+		Action.COAST,
+		Action.SOFT_BRAKE,
+		Action.COAST,
+		Action.SOFT_ACCEL,
+		Action.STRONG_ACCEL,
+	]
+	env_a = PedestrianNegotiationEnv("task_2_stochastic", seed=7)
+	env_b = PedestrianNegotiationEnv("task_2_stochastic", seed=7)
+	obs_a = env_a.reset()
+	obs_b = env_b.reset()
+	assert obs_a.model_dump() == obs_b.model_dump()
+	for action in actions:
+		step_a = env_a.step(action)
+		step_b = env_b.step(action)
+		assert step_a[0].model_dump() == step_b[0].model_dump()
+		assert step_a[1].model_dump() == step_b[1].model_dump()
+		assert step_a[2] == step_b[2]
+
+def test_crossing_belief_strengthens_for_stochastic_pedestrian():
+	env = PedestrianNegotiationEnv("task_2_stochastic", seed=11)
+	obs = env.reset()
+	initial_belief = obs.belief_crossing
+	for _ in range(4):
+		obs, _, done, _ = env.step(Action.COAST)
+		if done:
+			break
+	assert obs.belief_crossing > initial_belief
+
+def test_episode_does_not_end_just_because_pedestrian_retreats():
+	env = PedestrianNegotiationEnv("task_2_stochastic", seed=5)
+	env.reset()
+	env.ped_intent = env.ped_intent.RETREATING
+	env.ped_x = -0.45
+	env.ped_vx = -1.0
+	_, _, done, _ = env.step(Action.COAST)
+	assert not done
