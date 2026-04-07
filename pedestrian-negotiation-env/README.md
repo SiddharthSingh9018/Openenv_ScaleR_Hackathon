@@ -1,3 +1,10 @@
+---
+title: pedestrian-negotiation-env
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # pedestrian-negotiation-env
 
 POMDP environment for autonomous vehicle negotiation with a pedestrian crossing an urban road under uncertainty.
