@@ -2,7 +2,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict
+from typing import Dict, Optional
 import sys
 import uvicorn
 from pathlib import Path
@@ -75,7 +75,9 @@ def root():
 	return {"status": "ok"}
 
 @app.post("/reset")
-def reset(req: ResetRequest):
+def reset(req: Optional[ResetRequest] = None):
+	if req is None:
+		req = ResetRequest(task=TASKS[0].id, seed=42)
 	env = PedestrianNegotiationEnv(req.task, req.seed)
 	_envs[req.task] = env
 	obs = env.reset()
