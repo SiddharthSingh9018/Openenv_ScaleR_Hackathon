@@ -1,17 +1,20 @@
 {
   "task_1_static": {
-    "score": 0.96,
+    "score": 0.9600000000000001,
     "steps": 7,
-    "collision": false
+    "collision": false,
+    "llm_failures": 0
   },
   "task_2_stochastic": {
-    "score": 0.785,
+    "score": 0.7849999999999999,
     "steps": 30,
-    "collision": false
+    "collision": false,
+    "llm_failures": 0
   },
   "task_3_adversarial": {
     "score": 0.693,
     "steps": 30,
-    "collision": false
+    "collision": false,
+    "llm_failures": 0
   }
 }

@@ -78,12 +78,12 @@ def run_rule_based(task):
 
 
 def run_llm_agent(task):
-    import openai
+    from openai import OpenAI
 
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         return None
-    openai.api_key = api_key
+    client = OpenAI(api_key=api_key)
     response = httpx.post(f"{SERVER}/reset", json={"task": task, "seed": 42})
     obs = response.json()
     steps = 0
@@ -110,7 +110,7 @@ def run_llm_agent(task):
             f"belief_retreating={obs['belief_retreating']:.2f}, step={obs['step']}"
         )
         messages.append({"role": "user", "content": user_msg})
-        resp = openai.chat.completions.create(
+        resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
             temperature=0,

@@ -71,6 +71,30 @@ The 1D formulation is a deliberate abstraction for controlled evaluation, reprod
 
 All baseline requirements are met: scores exceed minimums and collisions are zero for all tasks.
 
+## Inference
+
+The submission entrypoint is `inference.py`.
+
+Required environment variables:
+
+- `API_BASE_URL`: base URL for the OpenAI-compatible LLM endpoint
+- `MODEL_NAME`: model identifier used for inference
+- `HF_TOKEN`: API key for the OpenAI-compatible endpoint
+
+Running from the repo root:
+
+```powershell
+python inference.py
+```
+
+The script:
+
+- emits structured `[START]`, `[STEP]`, and `[END]` logs
+- starts the local server automatically if needed
+- runs all tasks
+- writes results to `baseline_results.json`
+- falls back to the rule-based controller if the LLM endpoint is unavailable
+
 ## Verification
 
 - `pytest pedestrian-negotiation-env/tests/test_environment.py`

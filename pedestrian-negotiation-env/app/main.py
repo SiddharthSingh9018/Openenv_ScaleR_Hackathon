@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict
 import sys
+import uvicorn
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from environment import PedestrianNegotiationEnv, Action, ActionModel, Observation, Reward
@@ -137,3 +138,11 @@ def baseline():
 		score = fn(env.episode_log)
 		results[t.id] = {"score": score, "steps": steps, "collision": any(e["collision"] for e in env.episode_log)}
 	return results
+
+
+def main():
+	uvicorn.run("main:app", host="0.0.0.0", port=7860)
+
+
+if __name__ == "__main__":
+	main()
