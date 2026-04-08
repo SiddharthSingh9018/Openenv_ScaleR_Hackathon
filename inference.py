@@ -20,7 +20,7 @@ from run_baseline import VALID_ACTIONS, select_rule_action  # noqa: E402
 
 SERVER_URL = os.environ.get("SERVER_URL", "http://127.0.0.1:7860")
 API_BASE_URL = os.environ["API_BASE_URL"]
-MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+MODEL_NAME = os.environ["MODEL_NAME"]
 API_KEY = os.environ["API_KEY"]
 BENCHMARK = os.environ.get("BENCHMARK_NAME", "pedestrian-negotiation")
 DEFAULT_SEED = int(os.environ.get("SEED", "42"))
@@ -204,6 +204,8 @@ def main() -> int:
     if not check_server():
         return 1
 
+    os.environ["OPENAI_API_KEY"] = API_KEY
+    os.environ["OPENAI_BASE_URL"] = API_BASE_URL
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
     warmup_proxy(client)
 
