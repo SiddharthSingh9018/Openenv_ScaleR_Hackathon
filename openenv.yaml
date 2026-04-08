@@ -1,0 +1,73 @@
+name: pedestrian-negotiation
+version: "1.0.0"
+description: >
+  POMDP environment for adaptive autonomous road-crossing negotiation
+  under uncertainty, balancing safety, efficiency, and smoothness.
+tags: [autonomous-driving, pedestrian, pomdp, safety, uncertainty, reinforcement-learning]
+abstraction: >
+  Intentionally isolates longitudinal right-of-way negotiation at a
+  crosswalk for clean evaluation of safety, intent inference, and
+  sequential decision-making, rather than simulating full 2D urban driving.
+
+tasks:
+  - id: task_1_static
+    description: "Easy: pedestrian remains at curb; agent should cross quickly, smoothly, and without unnecessary braking."
+    difficulty: easy
+    max_steps: 80
+  - id: task_2_stochastic
+    description: "Medium: pedestrian may commit, hesitate, or retreat; agent must infer intent from noisy motion cues."
+    difficulty: medium
+    max_steps: 80
+  - id: task_3_adversarial
+    description: "Hard: pedestrian strategically hesitates, retreats, and re-enters, forcing repeated micro-negotiation under uncertainty and penalizing brittle control."
+    difficulty: hard
+    max_steps: 80
+
+action_space:
+  type: discrete
+  values: [STRONG_BRAKE, SOFT_BRAKE, COAST, SOFT_ACCEL, STRONG_ACCEL]
+
+observation_space:
+  type: object
+  fields:
+    vehicle_x:         {type: float}
+    vehicle_speed:     {type: float}
+    dist_to_crossing:  {type: float}
+    time_to_crossing:  {type: float}
+    ped_x:             {type: float}
+    ped_y:             {type: float}
+    ped_vx:            {type: float}
+    belief_crossing:   {type: float}
+    belief_hesitating: {type: float}
+    belief_retreating: {type: float}
+    step:              {type: int}
+    collision:         {type: bool}
+    crossed:           {type: bool}
+    vehicle_crossed:   {type: bool}
+
+evaluation:
+  deterministic: true
+  seed_support: true
+  score_range: [0.0, 1.0]
+  primary_objectives: [safety, efficiency, smoothness, intent-awareness]
+  episode_termination:
+    - collision
+    - vehicle_clears_crosswalk
+    - max_steps_reached
+  grader_notes:
+    - "Collision yields a score of 0.0 on all tasks."
+    - "Task 1 rewards safe, smooth, efficient crossing."
+    - "Task 2 rewards safe crossing plus correct intent-responsive behavior."
+    - "Task 3 rewards safety under adversarial uncertainty, stronger intent responsiveness, and penalties for oscillatory control."
+    - "On the hard task, safe completion alone is insufficient if the control policy repeatedly over-corrects."
+
+endpoints:
+  reset:    POST /reset
+  step:     POST /step
+  state:    GET  /state
+  tasks:    GET  /tasks
+  grader:   POST /grader
+  baseline: GET  /baseline
+
+docker:
+  port: 7860
