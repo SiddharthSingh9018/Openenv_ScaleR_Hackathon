@@ -20,7 +20,7 @@ from run_baseline import VALID_ACTIONS, select_rule_action  # noqa: E402
 SERVER_URL = os.environ.get("SERVER_URL", "http://127.0.0.1:7860")
 API_BASE_URL = os.environ.get("API_BASE_URL", "")
 MODEL_NAME = os.environ.get("MODEL_NAME", "")
-HF_TOKEN = os.environ.get("HF_TOKEN", "")
+API_KEY = os.environ.get("API_KEY", "")
 DEFAULT_SEED = int(os.environ.get("SEED", "42"))
 MAX_STEPS = int(os.environ.get("MAX_STEPS", "80"))
 RESULTS_PATH = Path.cwd() / "baseline_results.json"
@@ -177,6 +177,7 @@ def main() -> int:
             "server_url": SERVER_URL,
             "api_base_url": API_BASE_URL,
             "model_name": MODEL_NAME,
+            "llm_proxy_enabled": bool(API_BASE_URL and MODEL_NAME and API_KEY),
             "seed": DEFAULT_SEED,
         },
     )
@@ -187,8 +188,8 @@ def main() -> int:
         return 1
 
     client = None
-    if API_BASE_URL and MODEL_NAME and HF_TOKEN:
-        client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+    if API_BASE_URL and MODEL_NAME and API_KEY:
+        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
     try:
         tasks = get_tasks()

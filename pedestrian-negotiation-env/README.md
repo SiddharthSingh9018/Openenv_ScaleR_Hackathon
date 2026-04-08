@@ -86,7 +86,7 @@ Required environment variables:
 
 - `API_BASE_URL`: base URL for the OpenAI-compatible LLM endpoint
 - `MODEL_NAME`: model identifier used for inference
-- `HF_TOKEN`: API key for the OpenAI-compatible endpoint
+- `API_KEY`: API key for the injected LiteLLM/OpenAI-compatible proxy
 
 Running from the repo root:
 
