@@ -18,9 +18,9 @@ sys.path.insert(0, str(BASELINE_DIR))
 from run_baseline import VALID_ACTIONS, select_rule_action  # noqa: E402
 
 SERVER_URL = os.environ.get("SERVER_URL", "http://127.0.0.1:7860")
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1")
+API_BASE_URL = os.environ["API_BASE_URL"]
 MODEL_NAME = os.environ.get("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-API_KEY = os.environ.get("API_KEY") or os.environ.get("HF_TOKEN", "")
+API_KEY = os.environ["API_KEY"]
 BENCHMARK = os.environ.get("BENCHMARK_NAME", "pedestrian-negotiation")
 DEFAULT_SEED = int(os.environ.get("SEED", "42"))
 MAX_STEPS = int(os.environ.get("MAX_STEPS", "80"))
@@ -203,13 +203,8 @@ def main() -> int:
     if not check_server():
         return 1
 
-    client = None
-    if API_BASE_URL and API_KEY:
-        client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-        try:
-            warmup_proxy(client)
-        except Exception:
-            pass
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    warmup_proxy(client)
 
     try:
         tasks = get_tasks()
