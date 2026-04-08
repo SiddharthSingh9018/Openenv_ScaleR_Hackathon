@@ -19,7 +19,7 @@ from run_baseline import VALID_ACTIONS, select_rule_action  # noqa: E402
 
 SERVER_URL = os.environ.get("SERVER_URL", "http://127.0.0.1:7860")
 API_BASE_URL = os.environ.get("API_BASE_URL", "")
-MODEL_NAME = os.environ.get("MODEL_NAME", "")
+MODEL_NAME = os.environ.get("MODEL_NAME", "gpt-4o-mini")
 API_KEY = os.environ.get("API_KEY", "")
 DEFAULT_SEED = int(os.environ.get("SEED", "42"))
 MAX_STEPS = int(os.environ.get("MAX_STEPS", "80"))
@@ -97,6 +97,19 @@ def llm_action(client: OpenAI, task_id: str, obs: Dict, step: int) -> str:
     )
     action = response.choices[0].message.content.strip().split()[0]
     return action if action in VALID_ACTIONS else "COAST"
+
+
+def probe_llm(client: OpenAI) -> bool:
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": "Reply with exactly the word COAST."},
+            {"role": "user", "content": "Return one valid action token."},
+        ],
+        temperature=0,
+        max_tokens=4,
+    )
+    return bool(response.choices and response.choices[0].message.content)
 
 
 def run_episode(task: Dict, client: Optional[OpenAI]) -> Dict:
@@ -177,7 +190,7 @@ def main() -> int:
             "server_url": SERVER_URL,
             "api_base_url": API_BASE_URL,
             "model_name": MODEL_NAME,
-            "llm_proxy_enabled": bool(API_BASE_URL and MODEL_NAME and API_KEY),
+            "llm_proxy_enabled": bool(API_BASE_URL and API_KEY),
             "seed": DEFAULT_SEED,
         },
     )
@@ -188,10 +201,18 @@ def main() -> int:
         return 1
 
     client = None
-    if API_BASE_URL and MODEL_NAME and API_KEY:
+    if API_BASE_URL and API_KEY:
         client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
     try:
+        llm_probe_ok = False
+        if client is not None:
+            try:
+                llm_probe_ok = probe_llm(client)
+                emit("STEP", {"task": "proxy", "step": 0, "event": "llm_probe", "ok": llm_probe_ok})
+            except Exception as exc:
+                emit("STEP", {"task": "proxy", "step": 0, "event": "llm_probe_failed", "reason": str(exc)})
+
         tasks = get_tasks()
         results = {}
         for task in tasks:
@@ -200,7 +221,7 @@ def main() -> int:
         with RESULTS_PATH.open("w", encoding="utf-8") as handle:
             json.dump(results, handle, indent=2)
 
-        emit("END", {"status": "success", "results": results})
+        emit("END", {"status": "success", "llm_probe_ok": llm_probe_ok, "results": results})
         return 0
     except Exception as exc:
         emit("END", {"status": "error", "reason": str(exc)})
