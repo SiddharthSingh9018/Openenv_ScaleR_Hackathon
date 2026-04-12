@@ -158,14 +158,8 @@ def run_episode(task: Dict, client: Optional[OpenAI]) -> Dict:
         done = False
 
         for step in range(1, MAX_STEPS + 1):
-            action = select_rule_action(task_id, obs)
-            if client is not None:
-                try:
-                    action = llm_action(client, task_id, obs, step)
-                    last_error = None
-                except Exception as exc:
-                    action = select_rule_action(task_id, obs)
-                    last_error = str(exc)
+            action = llm_action(client, task_id, obs, step)
+            last_error = None
 
             step_response = httpx.post(
                 f"{SERVER_URL}/step",
