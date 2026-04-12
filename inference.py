@@ -19,10 +19,6 @@ sys.path.insert(0, str(BASELINE_DIR))
 from run_baseline import VALID_ACTIONS, select_rule_action  # noqa: E402
 
 SERVER_URL = os.environ.get("SERVER_URL", "http://127.0.0.1:7860")
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
-API_KEY = os.getenv("API_KEY")
-HF_TOKEN = os.getenv("HF_TOKEN")
 BENCHMARK = os.environ.get("BENCHMARK_NAME", "pedestrian-negotiation")
 DEFAULT_SEED = int(os.environ.get("SEED", "42"))
 MAX_STEPS = int(os.environ.get("MAX_STEPS", "80"))
@@ -91,9 +87,9 @@ def get_tasks() -> List[Dict]:
     return response.json()
 
 
-def warmup_proxy(client: OpenAI) -> None:
+def warmup_proxy(client: OpenAI, model_name: str) -> None:
     client.chat.completions.create(
-        model=MODEL_NAME,
+        model=model_name,
         messages=[
             {"role": "system", "content": "Reply with exactly one token: COAST"},
             {"role": "user", "content": "Return one valid action."},
@@ -103,9 +99,9 @@ def warmup_proxy(client: OpenAI) -> None:
     )
 
 
-def llm_action(client: OpenAI, task_id: str, obs: Dict, step: int) -> str:
+def llm_action(client: OpenAI, task_id: str, obs: Dict, step: int, model_name: str) -> str:
     response = client.chat.completions.create(
-        model=MODEL_NAME,
+        model=model_name,
         messages=[
             {
                 "role": "system",
@@ -138,14 +134,14 @@ def llm_action(client: OpenAI, task_id: str, obs: Dict, step: int) -> str:
     return action if action in VALID_ACTIONS else "COAST"
 
 
-def run_episode(task: Dict, client: Optional[OpenAI]) -> Dict:
+def run_episode(task: Dict, client: Optional[OpenAI], model_name: str) -> Dict:
     task_id = task["id"]
     rewards: List[float] = []
     steps_taken = 0
     success = False
     last_error: Optional[str] = None
 
-    log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
+    log_start(task=task_id, env=BENCHMARK, model=model_name)
 
     try:
         reset = httpx.post(
@@ -158,7 +154,7 @@ def run_episode(task: Dict, client: Optional[OpenAI]) -> Dict:
         done = False
 
         for step in range(1, MAX_STEPS + 1):
-            action = llm_action(client, task_id, obs, step)
+            action = llm_action(client, task_id, obs, step, model_name)
             last_error = None
 
             step_response = httpx.post(
@@ -193,22 +189,34 @@ def run_episode(task: Dict, client: Optional[OpenAI]) -> Dict:
         log_end(success=success, steps=steps_taken, rewards=rewards)
 
 
+def load_config() -> Dict[str, str]:
+    api_base_url = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+    model_name = os.getenv("MODEL_NAME", "gpt-4.1-mini")
+    api_key = os.getenv("API_KEY")
+    hf_token = os.getenv("HF_TOKEN")
+    token = api_key if api_key else hf_token
+    if token is None:
+        raise ValueError("API_KEY or HF_TOKEN environment variable is required")
+    if not api_base_url.rstrip("/").endswith("/v1"):
+        raise ValueError(f"API_BASE_URL must end with /v1, got: {api_base_url}")
+    return {"api_base_url": api_base_url, "model_name": model_name, "token": token}
+
+
 def main() -> int:
+    os.chdir(str(REPO_ROOT))
     server_process = start_local_server()
     if not check_server():
         return 1
 
-    if API_KEY is None and HF_TOKEN is None:
-        raise ValueError("API_KEY or HF_TOKEN environment variable is required")
-    token = API_KEY if API_KEY is not None else HF_TOKEN
-    client = OpenAI(base_url=API_BASE_URL, api_key=token)
-    warmup_proxy(client)
+    config = load_config()
+    client = OpenAI(base_url=config["api_base_url"], api_key=config["token"])
+    warmup_proxy(client, config["model_name"])
 
     try:
         tasks = get_tasks()
         results = {}
         for task in tasks:
-            results[task["id"]] = run_episode(task, client)
+            results[task["id"]] = run_episode(task, client, config["model_name"])
 
         with RESULTS_PATH.open("w", encoding="utf-8") as handle:
             json.dump(results, handle, indent=2)
