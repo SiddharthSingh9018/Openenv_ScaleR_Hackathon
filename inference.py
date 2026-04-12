@@ -19,9 +19,9 @@ sys.path.insert(0, str(BASELINE_DIR))
 from run_baseline import VALID_ACTIONS, select_rule_action  # noqa: E402
 
 SERVER_URL = os.environ.get("SERVER_URL", "http://127.0.0.1:7860")
-API_BASE_URL = os.environ["API_BASE_URL"]
-MODEL_NAME = os.environ["MODEL_NAME"]
-API_KEY = os.environ["API_KEY"]
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
+HF_TOKEN = os.getenv("HF_TOKEN")
 BENCHMARK = os.environ.get("BENCHMARK_NAME", "pedestrian-negotiation")
 DEFAULT_SEED = int(os.environ.get("SEED", "42"))
 MAX_STEPS = int(os.environ.get("MAX_STEPS", "80"))
@@ -42,10 +42,10 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     )
 
 
-def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+def log_end(success: bool, steps: int, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{reward:.2f}" for reward in rewards)
     print(
-        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
+        f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}",
         flush=True,
     )
 
@@ -141,7 +141,6 @@ def run_episode(task: Dict, client: Optional[OpenAI]) -> Dict:
     task_id = task["id"]
     rewards: List[float] = []
     steps_taken = 0
-    score = 0.0
     success = False
     last_error: Optional[str] = None
 
@@ -190,7 +189,7 @@ def run_episode(task: Dict, client: Optional[OpenAI]) -> Dict:
             "collision": bool(grade_json["details"]["collision"]),
         }
     finally:
-        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+        log_end(success=success, steps=steps_taken, rewards=rewards)
 
 
 def main() -> int:
@@ -198,9 +197,9 @@ def main() -> int:
     if not check_server():
         return 1
 
-    os.environ["OPENAI_API_KEY"] = API_KEY
-    os.environ["OPENAI_BASE_URL"] = API_BASE_URL
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    if HF_TOKEN is None:
+        raise ValueError("HF_TOKEN environment variable is required")
+    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     warmup_proxy(client)
 
     try:
