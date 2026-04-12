@@ -192,14 +192,12 @@ def run_episode(task: Dict, client: Optional[OpenAI], model_name: str) -> Dict:
 def load_config() -> Dict[str, str]:
     api_base_url = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
     model_name = os.getenv("MODEL_NAME", "gpt-4.1-mini")
-    api_key = os.getenv("API_KEY")
-    hf_token = os.getenv("HF_TOKEN")
-    token = api_key if api_key else hf_token
-    if token is None:
-        raise ValueError("API_KEY or HF_TOKEN environment variable is required")
+    hf_token = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+    if hf_token is None:
+        raise ValueError("HF_TOKEN environment variable is required")
     if not api_base_url.rstrip("/").endswith("/v1"):
         raise ValueError(f"API_BASE_URL must end with /v1, got: {api_base_url}")
-    return {"api_base_url": api_base_url, "model_name": model_name, "token": token}
+    return {"api_base_url": api_base_url, "model_name": model_name, "token": hf_token}
 
 
 def main() -> int:
