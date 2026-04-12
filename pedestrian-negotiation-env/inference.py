@@ -20,6 +20,7 @@ from run_baseline import VALID_ACTIONS, select_rule_action  # noqa: E402
 SERVER_URL = os.environ.get("SERVER_URL", "http://127.0.0.1:7860")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4.1-mini")
+API_KEY = os.getenv("API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
 BENCHMARK = os.environ.get("BENCHMARK_NAME", "pedestrian-negotiation")
 DEFAULT_SEED = int(os.environ.get("SEED", "42"))
@@ -197,9 +198,10 @@ def main() -> int:
         return 1
 
     os.environ["OPENAI_API_KEY"] = API_KEY
-    if HF_TOKEN is None:
-        raise ValueError("HF_TOKEN environment variable is required")
-    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
+    if API_KEY is None and HF_TOKEN is None:
+        raise ValueError("API_KEY or HF_TOKEN environment variable is required")
+    token = API_KEY if API_KEY is not None else HF_TOKEN
+    client = OpenAI(base_url=API_BASE_URL, api_key=token)
     warmup_proxy(client)
 
     try:
